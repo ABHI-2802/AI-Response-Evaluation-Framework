@@ -1,53 +1,81 @@
 # AI Response Evaluation Framework
 
-A framework for evaluating AI agent responses across multiple quality dimensions, including instruction adherence, factuality, relevance, coherence, and fluency.
+A small Streamlit application for comparing candidate AI responses with transparent, rule-based and text-similarity indicators.
 
-## Project overview
+## What it evaluates
 
-The project explores a multi-stage evaluation pipeline that combines semantic similarity, natural-language inference, text-quality metrics, rule-based instruction checks, and an LLM-assisted factuality workflow. Outputs can include per-dimension scores, explanations, and comparison visualizations.
+- **Instruction adherence:** checks supported constraints such as word limits, required/prohibited terms, and selected output formats.
+- **Prompt relevance:** estimates TF-IDF cosine similarity between the prompt and each response.
+- **Evidence alignment (similarity proxy):** compares response sentences with evidence text supplied in the input. This is not factual verification.
+- **Sentence continuity (proxy):** estimates lexical similarity between adjacent sentences.
+- **Surface fluency (proxy):** applies simple surface-level checks for sentence length, consecutive repeated words, and terminal punctuation.
 
-## Evaluation dimensions
+The composite index combines only available dimensions and renormalizes the weights. It is a heuristic comparison score, not a calibrated probability, factuality guarantee, or replacement for human review.
 
-- **Instruction adherence:** checks whether a response follows the requested constraints.
-- **Semantic relevance:** estimates alignment between the prompt and response with sentence embeddings.
-- **Factuality:** checks claims against retrieved evidence where supported integrations are configured.
-- **Coherence:** looks for consistency across sentences.
-- **Fluency and grammar:** uses language-quality signals to surface writing issues.
+## Repository files
 
-## Repository contents
+- app.py — Streamlit interface for editing/uploading JSON and viewing/downloadable results.
+- evaluator.py — independent scoring functions.
+- sample_input.json — example payload to try.
+- tests/test_evaluator.py — unit tests for basic behavior.
+- requirements.txt — Python dependencies.
 
-The implementation files are being organized. Add the notebook, sample input JSON, and any required configuration files before running the application.
+## Run locally
 
-## Setup
+Requires Python 3.10 or newer.
 
-Create and activate a Python virtual environment, then install the dependencies used by the implementation.
-
-```bash
-python -m venv .venv
+\`\`\`bash
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-If a dependency file is not present yet, install the libraries required by your implementation individually.
-
-## Configuration and API keys
-
-Some evaluation workflows may require third-party credentials, such as an LLM provider key or a search API key. Store keys in environment variables or Streamlit secrets; do not commit secrets to GitHub.
-
-## Run
-
-Once the Streamlit application entry point and dependencies are in place, run:
-
-```bash
 streamlit run app.py
-```
+\`\`\`
 
-Adjust the command to match the actual application file.
+On Windows, activate the environment with .venv\\Scripts\\activate instead of the source command.
 
-## Attribution and licensing
+## Input format
 
-This repository is being set up as a project workspace. Some design ideas are based on the public project [Agentic Evaluation Framework by devkumar1109](https://github.com/devkumar1109/e6data-X-IITBHU---MetaVerse). The upstream repository currently shows no license, so its source code should not be copied or redistributed unless permission or applicable licensing is confirmed. Verify the provenance of every file added here.
+The application accepts a JSON object with a prompt, optional constraints and evidence, and a list of responses:
 
-## Current status
+\`\`\`json
+{
+  "prompt": "Explain why testing AI responses matters.",
+  "constraints": {
+    "max_words": 90,
+    "must_include": ["reliability"],
+    "must_not_include": ["guaranteed"],
+    "expected_format": "bullets"
+  },
+  "evidence": [
+    "Testing helps teams identify inaccurate or incomplete responses."
+  ],
+  "responses": [
+    {
+      "agent": "Candidate A",
+      "response": "- Testing supports reliability by helping teams identify issues."
+    },
+    {
+      "agent": "Candidate B",
+      "response": "Responses should be reviewed before deployment."
+    }
+  ]
+}
+\`\`\`
 
-**Initial setup only:** this README does not imply that the full implementation or evaluation results have been independently reproduced.
+Supported expected_format values are json, bullets, numbered_list, and one_sentence. The evaluator only scores constraint types implemented in evaluator.py; unsupported formats are not scored.
+
+## Tests
+
+Run the unit tests with:
+
+\`\`\`bash
+python -m unittest discover -s tests
+\`\`\`
+
+## Limitations
+
+This baseline does not call an LLM, run a natural-language-inference model, retrieve live web evidence, or verify claims as true or false. Similarity to supplied evidence can be misleading. Scores should be checked against human judgments before use in any consequential workflow.
+
+## Implementation note
+
+The code in this repository is a fresh baseline implementation and does not include copied source files or assets from another repository. Extend and validate it before describing it as production-ready.
