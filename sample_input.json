@@ -1,0 +1,23 @@
+{
+  "prompt": "Explain why testing AI responses matters in a customer-support product.",
+  "constraints": {
+    "max_words": 90,
+    "must_include": ["reliability"],
+    "must_not_include": ["guaranteed"],
+    "expected_format": "bullets"
+  },
+  "evidence": [
+    "AI response evaluations can help identify inaccurate or incomplete answers before they reach customers.",
+    "Testing different responses helps teams compare instruction following, relevance, and writing quality."
+  ],
+  "responses": [
+    {
+      "agent": "Example A",
+      "response": "- Testing improves reliability by helping teams identify inaccurate or incomplete answers.\\n- Teams can compare relevance and instruction following before customers see the response."
+    },
+    {
+      "agent": "Example B",
+      "response": "AI answers are always perfect. Testing may help."
+    }
+  ]
+}
