@@ -24,20 +24,20 @@ The composite index combines only available dimensions and renormalizes the weig
 
 Requires Python 3.10 or newer.
 
-\`\`\`bash
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
-\`\`\`
+```
 
-On Windows, activate the environment with .venv\\Scripts\\activate instead of the source command.
+On Windows, activate the environment with .venv\Scripts\\activate instead of the source command.
 
 ## Input format
 
 The application accepts a JSON object with a prompt, optional constraints and evidence, and a list of responses:
 
-\`\`\`json
+```json
 {
   "prompt": "Explain why testing AI responses matters.",
   "constraints": {
@@ -60,7 +60,7 @@ The application accepts a JSON object with a prompt, optional constraints and ev
     }
   ]
 }
-\`\`\`
+```
 
 Supported expected_format values are json, bullets, numbered_list, and one_sentence. The evaluator only scores constraint types implemented in evaluator.py; unsupported formats are not scored.
 
@@ -68,9 +68,9 @@ Supported expected_format values are json, bullets, numbered_list, and one_sente
 
 Run the unit tests with:
 
-\`\`\`bash
+```bash
 python -m unittest discover -s tests
-\`\`\`
+```
 
 ## Limitations
 
