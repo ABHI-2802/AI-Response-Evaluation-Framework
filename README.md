@@ -12,7 +12,7 @@ As AI agents become more capable, they are increasingly deployed to perform task
 
 When you have hundreds of agents producing thousands of responses daily, manually checking them for correctness and quality is impossible. What we need is an automated evaluation framework that can reliably assess agent responses across multiple dimensions.
 
-This report describes the **Agentic Evaluation Framework** we developed for the E6data hackathon. It is a Streamlit-based system that can score AI responses on:
+This report describes the **Agentic Evaluation Framework**. It is a Streamlit-based system that can score AI responses on:
 
 - **Instruction adherence**
 - **Factual accuracy**
