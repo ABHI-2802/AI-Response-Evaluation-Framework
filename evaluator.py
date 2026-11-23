@@ -654,28 +654,38 @@ def evaluate_response(
     instruction_score = float(instruction_eval.get("final_score", 1.0))
 
     # 7. Factual Accuracy
+    factual_evaluated = False
+    fact_score: Optional[float] = None
     if groq_api_key and serpapi_api_key:
         fact_score, fact_details, claims, evidences = check_factuality(
             prompt, response, groq_api_key, serpapi_api_key
         )
+        factual_evaluated = True
     else:
-        fact_score = 1.0
-        fact_details = {"status": "Provide Groq & SerpAPI keys for live search verification"}
+        fact_score = None
+        fact_details = {"status": "Not evaluated (Groq and SerpAPI credentials required)"}
         claims = []
         evidences = []
 
     # Composite Normalized Score (0 - 100)
-    # Balanced weighting:
-    # 25% Semantic, 20% Entailment/Coherence, 20% Instruction, 15% Factuality, 10% Fluency, 10% Grammar
-    composite_100 = (
+    # Balanced base weighting across 7 dimensions (sum = 1.0):
+    # Semantic: 25%, Prompt Entailment: 10%, Sentence Coherence: 10%,
+    # Instruction Adherence: 20%, Fluency: 10%, Grammar: 10%, Factuality: 15%
+    remaining_weighted_sum = (
         (semantic_score * 0.25)
         + (ent_prob * 0.10)
         + (coherence["overall_entailment"] * 0.10)
         + (instruction_score * 0.20)
-        + (fact_score * 0.15)
         + (normalized_fluency * 0.10)
         + (grammar_score * 0.10)
-    ) * 100.0
+    )
+
+    if fact_score is not None:
+        # Factuality was evaluated (including a genuine score of 0.0)
+        composite_100 = (remaining_weighted_sum + (fact_score * 0.15)) * 100.0
+    else:
+        # Credentials missing: redistribute the 15% weight proportionally across remaining checks (sum = 0.85)
+        composite_100 = (remaining_weighted_sum / 0.85) * 100.0
 
     return {
         "prompt": prompt,
@@ -695,7 +705,8 @@ def evaluate_response(
         "grammar_errors": grammar_errors,
         "parsed_constraints": constraints,
         "instruction_adherence": instruction_eval,
-        "factual_accuracy_score": round(float(fact_score), 4),
+        "factual_accuracy_score": round(float(fact_score), 4) if fact_score is not None else None,
+        "factual_accuracy_display": f"{fact_score:.2f}" if fact_score is not None else "Not evaluated",
         "claims": claims,
         "evidences": evidences,
         "AI_as_judge_results": fact_details,
@@ -706,7 +717,7 @@ def evaluate_response(
             "Sentence Coherence": round(coherence["overall_entailment"] * 100.0, 1),
             "Fluency (Perplexity)": round(normalized_fluency * 100.0, 1),
             "Grammar Quality": round(grammar_score * 100.0, 1),
-            "Factual Accuracy": round(fact_score * 100.0, 1),
+            "Factual Accuracy": round(fact_score * 100.0, 1) if fact_score is not None else None,
         },
     }
 

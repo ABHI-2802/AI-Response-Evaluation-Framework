@@ -100,6 +100,93 @@ class EvaluatorPipelineTests(unittest.TestCase):
         self.assertIn("Semantic Similarity", result["dimensions"])
         self.assertIn("Sentence Coherence", result["dimensions"])
 
+    def test_missing_credentials_marks_factuality_unavailable_and_redistributes_weight(self):
+        prompt = "What is linear regression?"
+        response = "Linear regression models linear relationships between variables."
+
+        # Missing both keys
+        result_missing = evaluate_response(
+            prompt=prompt,
+            response=response,
+            groq_api_key=None,
+            serpapi_api_key=None,
+        )
+
+        # 1. Factuality must be marked as unavailable
+        self.assertIsNone(result_missing["factual_accuracy_score"])
+        self.assertEqual(result_missing["factual_accuracy_display"], "Not evaluated")
+        self.assertIsNone(result_missing["dimensions"]["Factual Accuracy"])
+
+        # 2. 15% weight must be redistributed across remaining 85% checks
+        sem = result_missing["semantic_score"]
+        ent = result_missing["entail_prob"]
+        coh = result_missing["coherence"]["overall_entailment"]
+        inst = result_missing["instruction_adherence"]["final_score"]
+        fl = result_missing["normalized_perplexity"]
+        gram = result_missing["grammar_score"]
+
+        remaining_weighted_sum = (
+            (sem * 0.25)
+            + (ent * 0.10)
+            + (coh * 0.10)
+            + (inst * 0.20)
+            + (fl * 0.10)
+            + (gram * 0.10)
+        )
+        expected_redistributed_score = round(float((remaining_weighted_sum / 0.85) * 100.0), 2)
+        self.assertEqual(result_missing["overall_score"], expected_redistributed_score)
+
+    def test_genuine_factuality_score_zero_must_count(self):
+        from unittest.mock import patch
+
+        prompt = "What is linear regression?"
+        response = "Linear regression plane turns into a pumpkin at midnight."
+
+        mock_eval = {
+            "reasoning": "The response makes completely false and hallucinated claims.",
+            "error": "Pumpkin claim is fabricated.",
+            "factuality": False,
+            "factually incorrect number of sentences": 1,
+        }
+
+        with patch("evaluator.check_factuality", return_value=(0.0, mock_eval, [{"claim": "pumpkin"}], ["evidence"])):
+            result_zero = evaluate_response(
+                prompt=prompt,
+                response=response,
+                groq_api_key="mock_groq_key",
+                serpapi_api_key="mock_serpapi_key",
+            )
+
+        # 1. Factuality score 0.0 must be preserved and distinct from None
+        self.assertIsNotNone(result_zero["factual_accuracy_score"])
+        self.assertEqual(result_zero["factual_accuracy_score"], 0.0)
+        self.assertEqual(result_zero["dimensions"]["Factual Accuracy"], 0.0)
+        self.assertEqual(result_zero["factual_accuracy_display"], "0.00")
+
+        # 2. Score must count with the 15% weight included (not redistributed)
+        sem = result_zero["semantic_score"]
+        ent = result_zero["entail_prob"]
+        coh = result_zero["coherence"]["overall_entailment"]
+        inst = result_zero["instruction_adherence"]["final_score"]
+        fl = result_zero["normalized_perplexity"]
+        gram = result_zero["grammar_score"]
+
+        remaining_weighted_sum = (
+            (sem * 0.25)
+            + (ent * 0.10)
+            + (coh * 0.10)
+            + (inst * 0.20)
+            + (fl * 0.10)
+            + (gram * 0.10)
+        )
+        # With factuality = 0.0, it contributes 0.0 * 0.15 = 0.0, and overall score is based on sum = 1.0 (not divided by 0.85)
+        expected_score_with_zero = round(float(remaining_weighted_sum + (0.0 * 0.15)) * 100.0, 2)
+        self.assertEqual(result_zero["overall_score"], expected_score_with_zero)
+
+        # 3. Overall score with factuality=0.0 MUST be strictly lower than when factuality was unavailable
+        expected_score_if_redistributed = round(float((remaining_weighted_sum / 0.85) * 100.0), 2)
+        self.assertLess(result_zero["overall_score"], expected_score_if_redistributed)
+
     def test_evaluate_payload_with_input_json(self):
         input_path = Path(__file__).resolve().parent.parent / "input.json"
         if input_path.exists():

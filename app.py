@@ -186,19 +186,21 @@ else:
         avg_semantic = np.mean([r["semantic_score"] for r in results])
         avg_fluency = np.mean([r["normalized_perplexity"] for r in results])
         avg_grammar = np.mean([r["grammar_score"] for r in results])
-        avg_fact = np.mean([r["factual_accuracy_score"] for r in results])
+        evaluated_fact = [r["factual_accuracy_score"] for r in results if r.get("factual_accuracy_score") is not None]
+        avg_fact_str = f"{np.mean(evaluated_fact):.2f}" if evaluated_fact else "Not evaluated"
 
         m_col1, m_col2, m_col3, m_col4, m_col5 = st.columns(5)
         m_col1.metric("🏆 Top Performer", f"{top_agent}", f"{top_score:.1f}/100")
         m_col2.metric("🎯 Avg Semantic", f"{avg_semantic:.2f}")
         m_col3.metric("✨ Avg Fluency", f"{avg_fluency:.2f}")
         m_col4.metric("📝 Avg Grammar", f"{avg_grammar:.2f}")
-        m_col5.metric("⚖️ Avg Factuality", f"{avg_fact:.2f}")
+        m_col5.metric("⚖️ Avg Factuality", avg_fact_str)
 
         # Leaderboard Table
         st.markdown("### 🏅 Candidate Ranking")
         summary_rows = []
         for r in results:
+            fact_val = f"{r['factual_accuracy_score']:.2f}" if r.get("factual_accuracy_score") is not None else "Not evaluated"
             summary_rows.append({
                 "Agent": r["agent"],
                 "Composite Score (0-100)": r["overall_score"],
@@ -208,7 +210,7 @@ else:
                 "Fluency Score": f"{r['normalized_perplexity']:.2f}",
                 "Grammar Score": f"{r['grammar_score']:.2f}",
                 "Instruction Score": f"{r['instruction_adherence'].get('final_score', 1.0):.2f}",
-                "Factual Score": f"{r['factual_accuracy_score']:.2f}",
+                "Factual Score": fact_val,
             })
         df_summary = pd.DataFrame(summary_rows)
         st.dataframe(df_summary, use_container_width=True)
@@ -232,14 +234,18 @@ else:
         axs[0, 0].grid(True, linestyle=":", alpha=0.6)
 
         # Chart 2: Factuality
-        fact_scores = [r["factual_accuracy_score"] for r in results]
-        axs[0, 1].plot(n, fact_scores, marker="s", color="#2196F3", linewidth=2)
-        axs[0, 1].axhline(y=avg_fact, linestyle="--", color="#1565C0", label=f"Avg: {avg_fact:.2f}")
+        if evaluated_fact:
+            fact_scores = [r["factual_accuracy_score"] if r.get("factual_accuracy_score") is not None else 0.0 for r in results]
+            avg_fact_val = float(np.mean(evaluated_fact))
+            axs[0, 1].plot(n, fact_scores, marker="s", color="#2196F3", linewidth=2)
+            axs[0, 1].axhline(y=avg_fact_val, linestyle="--", color="#1565C0", label=f"Avg: {avg_fact_val:.2f}")
+            axs[0, 1].legend()
+        else:
+            axs[0, 1].text(0.5, 0.5, "Not evaluated\n(Credentials not provided)", ha="center", va="center", transform=axs[0, 1].transAxes, fontsize=11, color="gray")
         axs[0, 1].set_title("Factual Accuracy (SerpAPI + LLM Judge)")
         axs[0, 1].set_xticks(n)
         axs[0, 1].set_xticklabels(agent_labels, rotation=30)
         axs[0, 1].set_ylim(0, 1.05)
-        axs[0, 1].legend()
         axs[0, 1].grid(True, linestyle=":", alpha=0.6)
 
         # Chart 3: Fluency
@@ -387,7 +393,14 @@ else:
 
         # 1.6 Factual Accuracy Check
         st.subheader("1.6. Factual Accuracy Check")
-        st.metric("Factual Accuracy Score", f"{selected_data['factual_accuracy_score']:.2f}")
+        if selected_data.get("factual_accuracy_score") is not None:
+            st.metric("Factual Accuracy Score", f"{selected_data['factual_accuracy_score']:.2f}")
+        else:
+            st.metric("Factual Accuracy Score", "Not evaluated")
+            st.info(
+                "Factual accuracy is **Not evaluated** because Groq or SerpAPI credentials were not provided. "
+                "Its 15% weight has been proportionally redistributed across the other active dimensions."
+            )
 
         if selected_data["claims"]:
             with st.expander("Extracted Claims", expanded=False):
