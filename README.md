@@ -1,138 +1,178 @@
-# AI Response Evaluation Framework
+# Agentic Evaluation Framework
 
-A transparent, explainable, and multi-dimensional evaluation framework for benchmarking AI agent responses. Includes a complete Streamlit web dashboard, heuristic scoring engine, diagnostic test suite, and exportable audit reports.
+*A Scalable and Explainable System for Evaluating AI Agent Responses*
 
----
-
-## 🌟 Key Features
-
-- **Multi-Dimensional Evaluation:**
-  - 📏 **Instruction Adherence:** Checks rule constraints including word limits (`min_words`, `max_words`), mandatory keywords (`must_include`), prohibited terms (`must_not_include`), and formatting (`bullets`, `numbered_list`, `json`, `one_sentence`).
-  - 🎯 **Prompt Relevance:** Computes TF-IDF cosine similarity between the input prompt and each candidate response.
-  - 📑 **Evidence Alignment (Similarity Proxy):** Compares response sentences against supplied factual evidence or reference text.
-  - 🔗 **Sentence Continuity:** Evaluates inter-sentence lexical cohesion and penalizes repetitive sentences.
-  - ✨ **Surface Fluency:** Surface-level indicators checking sentence lengths, consecutive word repetitions, and terminal punctuation.
-- **Dynamic Composite Index:** Automatically normalizes active evaluation dimension weights into a unified 0–100 score.
-- **Interactive Streamlit Dashboard (`app.py`):**
-  - Dataset preset selector (Customer Support benchmark vs. Linear Regression multi-agent responses).
-  - JSON payload upload or live JSON editing.
-  - Metric summary cards (top performer, average score, candidate count).
-  - Visual charts: Overall composite score comparison and multi-dimension breakdown.
-  - Diagnostic expanders with rule-by-rule pass/fail badges.
-  - Export evaluation results to JSON and CSV.
-- **Flexible Input Schemas:** Seamlessly supports both `"responses"` and `"agent_responses"`.
+On running the above factcheckhackathon notebook, it directs you towards the streamlit based app shown in the demo video, where input is the json responses of multiple agents for a single prompt.
 
 ---
 
-## 📁 Repository Structure
+## 1. Introduction
 
-```
-├── app.py                      # Interactive Streamlit dashboard
-├── evaluator.py                # Core evaluation engine and heuristic metrics
-├── sample_input.json           # Sample payload with constraints and evidence
-├── input.json                  # Multi-agent response dataset (Linear Regression)
-├── requirements.txt            # Python dependencies
-├── tests/
-│   └── test_evaluator.py       # Comprehensive unit tests
-├── factcheckhackathon.ipynb    # Supplementary experimentation notebook
-├── HACKATHON_REPORT.md         # Original Hackathon documentation & architecture
-└── README.md                   # Project documentation
-```
+As AI agents become more capable, they are increasingly deployed to perform tasks like answering questions, summarizing texts, generating reports, and assisting with decision-making. While these agents are powerful, their reliability is not guaranteed. They may hallucinate facts, ignore instructions, or make unwarranted assumptions.
 
----
+When you have hundreds of agents producing thousands of responses daily, manually checking them for correctness and quality is impossible. What we need is an automated evaluation framework that can reliably assess agent responses across multiple dimensions.
 
-## 🚀 Getting Started
+This report describes the **Agentic Evaluation Framework** we developed for the E6data hackathon. It is a Streamlit-based system that can score AI responses on:
 
-### Prerequisites
+- **Instruction adherence**
+- **Factual accuracy**
+- **Assumption control**
+- **Coherence and fluency**
 
-- Python 3.10 or newer
-
-### Installation
-
-1. Create and activate a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-# On Windows: .venv\Scripts\activate
-```
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-### Running the Web Dashboard
-
-Launch the Streamlit app:
-
-```bash
-streamlit run app.py
-```
-
-The app will open automatically in your browser at `http://localhost:8501`.
+The system produces interpretable dashboards, scores, reasoning, and visualizations, making it easier to trust and improve AI systems at scale.
 
 ---
 
-## 🧪 Running Unit Tests
+## 2. Goals of the Framework
 
-Execute the automated test suite with Python's built-in `unittest`:
+Our hackathon challenge was to design a system that:
 
-```bash
-python3 -m unittest discover -s tests
-```
+- Accepts prompts, responses, and metadata for hundreds of agents.
+- Evaluates responses across key dimensions:
+  - Instruction-following
+  - Factual accuracy / hallucination detection
+  - Assumption control
+  - Coherence and accuracy
+- Provides interpretable outputs: scores, leaderboards, reports.
+- Scales to thousands of responses.
+- Offers explainability, so developers know why a response failed.
 
----
-
-## 📝 Input Format Specification
-
-The framework accepts JSON payloads formatted in either standard or agent-benchmark structures:
-
-### Option A: Standard Format with Constraints & Evidence
-
-```json
-{
-  "prompt": "Explain why testing AI responses matters in customer support.",
-  "constraints": {
-    "max_words": 90,
-    "min_words": 10,
-    "must_include": ["reliability"],
-    "must_not_include": ["guaranteed"],
-    "expected_format": "bullets"
-  },
-  "evidence": [
-    "AI response evaluations help teams catch inaccurate answers before they reach users."
-  ],
-  "responses": [
-    {
-      "agent": "Model A",
-      "response": "- Testing improves reliability by catching errors early.\n- Teams can verify adherence before deployment."
-    },
-    {
-      "agent": "Model B",
-      "response": "Everything is always guaranteed."
-    }
-  ]
-}
-```
-
-### Option B: Array Format (`agent_responses`)
-
-```json
-{
-  "prompt": "What are the assumptions of Linear Regression?",
-  "agent_responses": [
-    "Linear regression assumes linearity, homoscedasticity, and normal residuals...",
-    "The primary assumption is a straight line relation..."
-  ]
-}
-```
+**Stretch goals included:**
+- AI-judge integration (LLM-based evaluators).
+- Visualization tools like heatmaps and charts.
+- Support for multiple domains such as Q&A, summarization, and reasoning.
 
 ---
 
-## ⚖️ Heuristic Calibration & Limitations
+## 3. System Architecture
 
-- The metrics provided are transparent heuristic indicators and text-similarity proxies designed for fast filtering, ranking, and human-in-the-loop audit.
-- Evidence alignment estimates lexical similarity to supplied reference texts; it is not a substitution for semantic truth verification or live factual retrieval.
-- For high-stakes decisions, use these scores as diagnostic signals alongside human verification.
+The framework is implemented as a Streamlit dashboard application with the following workflow:
+
+### Input
+- User prompt
+- Agent response
+- API keys (Groq for LLM judges, SerpAPI for factual checks)
+
+### Evaluation Pipeline
+- **Semantic similarity:** SentenceTransformers
+- **Logical entailment/contradiction:** Facebook BART NLI model
+- **Sequential coherence:** sentence-by-sentence NLI to check consistency
+- **Fluency & grammar:** GPT-2 perplexity + LanguageTool
+- **Instruction adherence:** Regex parsing + Groq LLM judge
+- **Factual accuracy:** claim extraction + SerpAPI evidence + LLM judgment
+
+### Output
+- Numerical scores (0–1)
+- Charts (bar graphs for coherence)
+- JSON reports with reasoning
+- Final composite evaluation
+
+---
+
+## 4. Methodology & Components
+
+### 4.1 Semantic Similarity
+- **Model:** SentenceTransformers (`all-MiniLM-L6-v2`)
+- Cosine similarity → measures alignment between prompt and response meaning.
+- **Score range:** 0–1 (closer to 1 = higher relevance).
+
+### 4.2 Entailment & Logical Relations
+- **Model:** `facebook/bart-large-mnli` (NLI).
+- Checks if response:
+  - **Entails** (consistent)
+  - **Neutral** (partially related)
+  - **Contradicts** (incorrect)
+
+### 4.3 Sequential Sentence Coherence
+- Splits response into sentences.
+- Runs pairwise NLI checks.
+- Charts show entailment, neutrality, contradiction probabilities.
+- Detects response drift/contradictions.
+
+### 4.4 Fluency & Text Quality
+- **Lexical Diversity:** unique tokens ÷ total tokens (detects repetition).
+- **Perplexity (Fluency):** GPT-2 → lower = smoother language.
+- **Grammar Check:** LanguageTool API → detects spelling/grammar errors.
+
+### 4.5 Instruction Adherence
+- **Regex-based parsing:** detects constraints (word limits, formatting, tone, forbidden content).
+- **LLM Judge (Groq):**
+  - Scores per-constraint.
+  - Provides reasoning.
+- Hybrid approach ensures rule + subtle style checks.
+
+### 4.6 Factual Accuracy
+- **Claim Extraction:** LLM extracts claims.
+- **Query Generation & Evidence Gathering:** converts claims into queries, fetches evidence via SerpAPI.
+- **Evaluation:** Groq LLM reviews evidence, outputs JSON (reasoning, corrections, factuality).
+- **Scoring:**
+  $$\text{Factual Score} = 1 - \frac{\text{Incorrect Sentences}}{\text{Total Sentences}}$$
+
+---
+
+## 5. What We Delivered
+
+- **STATE-OF-THE-ART:** We developed a robust evaluation framework that integrates multiple research-backed metrics and open-source libraries into a single streamlined workflow.
+- **VISUALIZED RESULTS:** Our framework includes an intuitive, visually appealing dashboard that highlights response accuracies, trends, and performance comparisons across agents.
+- **COST-EFFICIENT:** The solution is completely free to use in its base form, with the option to enhance capabilities through premium API tiers for higher rate limits.
+- **SCALABLE:** Built with scalability in mind, the system supports parallel processing and can efficiently handle thousands of queries from multiple agents in real-world scenarios.
+
+---
+
+## 6. Scoring Pipeline
+
+Each module outputs scores between 0 and 1:
+- Semantic Similarity
+- NLI (Entailment/Contradiction)
+- Sentence Coherence
+- Fluency (Perplexity + Lexical Diversity)
+- Grammar Quality
+- Instruction Adherence
+- Factual Accuracy
+
+Scores can be reported individually (diagnostic) or combined into a final leaderboard score.
+
+---
+
+## 7. Interpretability & Explainability
+
+- **Instruction checks** → parsed constraints shown.
+- **Grammar errors** → listed with context.
+- **Factual checks** → reasoning + suggested corrections.
+- **Coherence** → stacked bar chart visualization.
+- Developers see why an agent failed, not just that it failed.
+
+---
+
+## 8. Scalability & Robustness
+
+- Streamlit caching avoids repeated model loading.
+- Batch processing: CSV/JSON uploads (1000s of responses).
+- Hybrid approach: rule-based + ML + LLM judges.
+- API integrations: Groq, SerpAPI.
+
+---
+
+## 9. Limitations & Future Work
+
+### Current Limitations
+- Dependence on external APIs → latency + costs.
+- Factual checks limited by search engine coverage.
+
+### Future Improvements
+- Offline fact-check databases (reduce reliance on live searches).
+- Ensemble AI judges (multiple LLM evaluators).
+- Domain-specific scoring modules (medicine, law, finance).
+- ML-based score weighting: train ML models on 1000+ labeled responses to optimize weights (semantic similarity, factuality, fluency, etc.).
+
+---
+
+## 10. Conclusion
+
+We successfully built an Agentic Evaluation Framework that:
+- Scales to thousands of responses.
+- Scores agents across multiple dimensions.
+- Provides explainable outputs and visualizations.
+- Uses a hybrid approach: rules + ML + LLMs.
+
+This framework addresses the urgent need for trustworthy AI evaluation and lays the groundwork for industrial applications where AI reliability is critical.
