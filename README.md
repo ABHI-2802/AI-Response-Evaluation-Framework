@@ -176,3 +176,10 @@ We successfully built an Agentic Evaluation Framework that:
 - Uses a hybrid approach: rules + ML + LLMs.
 
 This framework addresses the urgent need for trustworthy AI evaluation and lays the groundwork for industrial applications where AI reliability is critical.
+
+---
+
+## Author
+
+- **ABHISHEK BIRADAR**
+
