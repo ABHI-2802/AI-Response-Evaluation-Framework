@@ -48,22 +48,31 @@ def evaluate_instruction_adherence(response: str, constraints: dict[str, Any]) -
     word_count = len(tokens(response))
 
     if "max_words" in constraints:
-        limit = int(constraints["max_words"])
-        checks.append({
-            "rule": f"At most {limit} words",
-            "passed": word_count <= limit,
-            "detail": f"Response has {word_count} words."
-        })
+        try:
+            limit = int(constraints["max_words"])
+            checks.append({
+                "rule": f"At most {limit} words",
+                "passed": word_count <= limit,
+                "detail": f"Response has {word_count} words."
+            })
+        except (ValueError, TypeError):
+            pass
 
     if "min_words" in constraints:
-        limit = int(constraints["min_words"])
-        checks.append({
-            "rule": f"At least {limit} words",
-            "passed": word_count >= limit,
-            "detail": f"Response has {word_count} words."
-        })
+        try:
+            limit = int(constraints["min_words"])
+            checks.append({
+                "rule": f"At least {limit} words",
+                "passed": word_count >= limit,
+                "detail": f"Response has {word_count} words."
+            })
+        except (ValueError, TypeError):
+            pass
 
-    for term in constraints.get("must_include", []):
+    must_inc = constraints.get("must_include", [])
+    if isinstance(must_inc, str):
+        must_inc = [must_inc]
+    for term in must_inc:
         passed = str(term).casefold() in response.casefold()
         checks.append({
             "rule": f"Must include: {term}",
@@ -71,7 +80,10 @@ def evaluate_instruction_adherence(response: str, constraints: dict[str, Any]) -
             "detail": "Required text found." if passed else "Required text not found."
         })
 
-    for term in constraints.get("must_not_include", []):
+    must_not_inc = constraints.get("must_not_include", [])
+    if isinstance(must_not_inc, str):
+        must_not_inc = [must_not_inc]
+    for term in must_not_inc:
         passed = str(term).casefold() not in response.casefold()
         checks.append({
             "rule": f"Must not include: {term}",
@@ -90,14 +102,14 @@ def evaluate_instruction_adherence(response: str, constraints: dict[str, Any]) -
             except (json.JSONDecodeError, TypeError):
                 passed = False
                 detail = "Response is not valid JSON."
-        elif expected_format == "bullets":
+        elif expected_format in ("bullets", "bullet", "bullet_list", "bullet_points"):
             passed = bool(re.search(r"(?m)^\s*[-*•]\s+", response))
             detail = "Bullet list marker found." if passed else "No bullet list marker found."
-        elif expected_format == "numbered_list":
+        elif expected_format in ("numbered_list", "numbered", "numbers"):
             passed = bool(re.search(r"(?m)^\s*\d+[.)]\s+", response))
             detail = "Numbered-list marker found." if passed else "No numbered-list marker found."
-        elif expected_format == "one_sentence":
-            passed = len(sentences(response)) <= 1
+        elif expected_format in ("one_sentence", "single_sentence"):
+            passed = len(sentences(response)) <= 1 and len(sentences(response)) > 0
             detail = f"Detected {len(sentences(response))} sentence(s)."
         else:
             passed = None
@@ -132,6 +144,8 @@ def evidence_alignment(response: str, evidence: list[str]) -> float | None:
 
 def sentence_continuity(response: str) -> float:
     """A limited proxy based on lexical similarity between adjacent sentences."""
+    if not (response or "").strip():
+        return 0.0
     parts = sentences(response)
     if len(parts) < 2:
         return 100.0
@@ -223,16 +237,16 @@ def evaluate_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
     prompt = str(payload.get("prompt", ""))
     constraints = payload.get("constraints") or {}
     evidence = payload.get("evidence") or []
-    responses = payload.get("responses") or []
+    responses = payload.get("responses") or payload.get("agent_responses") or []
     results = []
 
     for index, item in enumerate(responses, start=1):
         if isinstance(item, str):
             text = item
-            agent = f"Response {index}"
+            agent = f"Agent {index}"
         elif isinstance(item, dict):
             text = str(item.get("response", ""))
-            agent = str(item.get("agent", item.get("name", f"Response {index}")))
+            agent = str(item.get("agent", item.get("name", f"Agent {index}")))
         else:
             continue
         results.append(evaluate_response(prompt, text, constraints, evidence, agent))
